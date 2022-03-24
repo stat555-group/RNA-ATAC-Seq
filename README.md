@@ -18,7 +18,7 @@ The RNA-Seq data were downloaded in tsv format using the following code:
 python3 download_data.py -i encode_ids.txt -o data/rna_seq/ -t rna-seq
 ```
 
-The ATAC-Seq data were downloaded in tsv format using the following code:
+The ATAC-Seq data were downloaded in bigBed format using the following code:
 
 ```
 python3 download_data.py -i encode_ids.txt -o data/atac_seq/ -t atac-seq
