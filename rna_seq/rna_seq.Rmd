@@ -8,6 +8,20 @@ output: html_document
 knitr::opts_chunk$set(warning = F, message = F)
 ```
 
+```{r}
+library(gplots)
+library(reshape2)
+library(RColorBrewer)
+library(plyr)
+library(lattice)
+library(genefilter)
+library(ggplot2)
+library(viridis)
+library(DESeq2)
+library(tidyr)
+library(biomaRt)
+```
+
 HTSeq function htseq-count was used to count reads. Counts for all samples were concatenated into the following text file: RNASeq_htseq_gene.txt
 
 The phenotype information for the samples including case/control status in a text file : RNAseq_Info_Sheet.txt
@@ -107,4 +121,21 @@ make_heatmap <- function(df){
 }
 ```
 
+### Volcano Plot
+
+```{r}
+volcanoplot <- ggplot(res_df, aes(x=log2FoldChange, y=-log10(pvalue), col = Expression, label = label))+
+  geom_point()+
+  theme_classic()+
+  theme(text = element_text(size = 20, family = "Arial", color = "black"))+
+  geom_vline(xintercept=c(-1, 1), col="grey", linetype = "dashed") +
+  geom_hline(yintercept=-log10(0.05), col="grey", linetype = "dashed")+
+  scale_color_manual(values = c("blue", "grey", "red"))+
+  xlim(-4, 4)+
+  geom_text_repel(aes(fontface = "bold"))+
+  theme(legend.position = "top")+
+  labs(x=expression(log[2](Fold~change)), y=expression(-log[10](p-value)))
+
+volcanoplot
+```
 
