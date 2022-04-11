@@ -1,1 +1,110 @@
-# Processing RNA-seq data 
+---
+title: 'STAT 555 : RNA-Seq Analysis (Group Project)'
+date: "4/11/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = F)
+```
+
+HTSeq function htseq-count was used to count reads. Counts for all samples were concatenated into the following text file: RNASeq_htseq_gene.txt
+
+The phenotype information for the samples including case/control status in a text file : RNAseq_Info_Sheet.txt
+
+### Read Data files
+
+```{r}
+pdata <- read.table('RNAseq_Info_Sheet.txt', sep='\t', header=TRUE)
+
+countdata <- read.table('RNASeq_htseq_gene.txt', sep='\t', header=TRUE)
+names(countdata) <- gsub('count_','',names(countdata))
+countdata <- countdata[,c('Gene',as.character(pdata$Sample))]
+row.names(countdata) <- countdata$Gene
+```
+
+
+### Case vs control samples
+
+```{r}
+#Assign variables
+ctrl <- ""
+case <- ""
+
+#Filter the info sheet for the two conditions being tested
+pdata_curr <- pdata[which(pdata$Status==case | pdata$Status==ctrl),]
+pdata_curr <- pdata_curr[order(as.character(pdata_curr$Sample)), ]
+pdata_curr$Status <- factor(pdata_curr$Status, levels = c(ctrl,case)) # make sure that control is being used as reference level (else DESeq2 does it alphabetically)
+rownames(pdata_curr) <- pdata_curr$Sample
+pdata_curr$Sample <- NULL
+```
+
+### DE analysis
+
+```{r, eval=T, echo=F, message=F}
+
+#subset countdata and pdata to 
+countdata_curr <- countdata[,which(colnames(countdata) %in% rownames(pdata_curr))] 
+
+#columns must be ordered in the same way
+countdata_curr <- countdata_curr[ ,order(as.character(names(countdata_curr)))] 
+
+
+#filter out low count genes 
+keep <- rowSums(countdata_curr)>=10
+countdata_curr <- countdata_curr[keep,]
+
+#get deseq model
+ddsFullCountTable <- DESeqDataSetFromMatrix(countData = countdata_curr, coldata = pdata_curr, design = ~ Status)
+
+#analysis
+dds <- DESeq(ddsFullCountTable)
+
+#normalized counts
+dds_count <- counts(dds, normalize=T)
+
+# output results
+res <- results(dds, cooksCutoff=FALSE, independentFiltering=FALSE)
+res$gene_id <- row.names(res) 
+
+# add gene symbols for DE results
+res_df <- as.data.frame(res)
+res_df <- merge(countdata[which(countdata$Gene%in%res_df$gene_id),c("Gene","gene_symbol")],res_df,by.x="Gene",by.y="gene_id")
+res_df <- res_df[order(res_df$pvalue, decreasing=FALSE),]
+  
+```
+
+### Heatmap
+
+```{r}
+#rlog transformations - to use for heatmap and PCA plot
+rld<- rlogTransformation(dds, blind=FALSE)
+
+#assign colors
+colour_status <- c("navy","red")
+names(colour_status) <- c(ctrl,case) 
+colour_status_list <- unlist(lapply(pdata_curr$Status,function(x){colour_status[x]}))
+
+make_heatmap <- function(df){
+  #Log2 of counts
+  mat = log2(dds_count+1)
+  
+  #Top 20 genes
+  top.mat <- m[rownames(m)%in%tb[1:20,"Gene"],] 
+  array_name <- colnames(m)
+  gene_symbol=df[1:20,"gene_symbol"]
+  
+  #Make heatmap
+  heatmap.2(na.omit(top.mat), col=viridis(256, option="B"),
+    ColSideColors=colour_status_list, #use list of assigned colors
+    labCol=array_name, labRow=gene_symbol, 
+    trace="none",
+    margins=c(12,20), 
+    cexRow=1,cexCol=1,
+    keysize=1.5,key.title=NA,key.xlab="Log2-normalized counts",key.ylab="Counts",
+    main="")
+  legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.8) #use list of assigned colors
+}
+```
+
+
