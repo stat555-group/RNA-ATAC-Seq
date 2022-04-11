@@ -16,6 +16,7 @@ mkdir data && mkdir data/rna_seq && mkdir data/atac_seq
 The RNA-Seq data were downloaded in tsv format using the following code:
 
 ```
+pip install wget
 python3 download_data.py -i encode_ids.txt -o data/rna_seq/ -t rna-seq
 ```
 
