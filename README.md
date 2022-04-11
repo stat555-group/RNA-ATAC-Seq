@@ -11,7 +11,7 @@ Link to report and presentation files: https://drive.google.com/drive/folders/1E
 First, create a ```data``` directory that contains the folders ```rna_seq``` and ``atac_seq``.
 
 ```
-mkdir data && mkdir data/rna_seq && mkdir atac_seq
+mkdir data && mkdir data/rna_seq && mkdir data/atac_seq
 ```
 The RNA-Seq data were downloaded in tsv format using the following code:
 
