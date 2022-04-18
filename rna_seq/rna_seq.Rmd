@@ -53,18 +53,18 @@ rownames(pdata_curr) <- pdata_curr$Sample
 pdata_curr$Sample <- NULL
 ```
 
-### DE analysis
 
+### DE analysis for 24 pair (CMP, ERY)
 ```{r, eval=T, echo=F, message=F}
 
-#subset countdata and pdata to 
-countdata_curr <- countdata[,which(colnames(countdata) %in% rownames(pdata_curr))] 
+#subset countdata and pdata to
+countdata_curr <- countdata[,which(colnames(countdata) %in% rownames(pdata_curr))]
 
 #columns must be ordered in the same way
-countdata_curr <- countdata_curr[ ,order(as.character(names(countdata_curr)))] 
+countdata_curr <- countdata_curr[ ,order(as.character(names(countdata_curr)))]
 
 
-#filter out low count genes 
+#filter out low count genes
 keep <- rowSums(countdata_curr)>=10
 countdata_curr <- countdata_curr[keep,]
 
