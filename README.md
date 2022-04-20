@@ -27,5 +27,5 @@ python3 download_data.py -i encode_ids.txt -o data/atac_seq/ -t atac-seq
 For conversion of the ATAC-Seq to tab files, the following scrip was run
 while inside the ```atac-seq``` directory:
 ```
-bash convert_atac_seq.sh ../atac_seq ../data/atac_seq
+bash convert_atac_seq.sh ../atac_seq/ ../data/atac_seq/
 ```
