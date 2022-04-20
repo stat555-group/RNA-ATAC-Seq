@@ -1,13 +1,15 @@
 ---
 title: "atac_seq"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ### Differential Analysis of ATAC-Seq data 
 ```{r}
 # List of file prefixes
 fileNames <- c("ENCFF181AMY","ENCFF255IVU","ENCFF343PTQ","ENCFF599ZDJ",
-"ENCFF616EWK","ENCFF662DYG","ENCFF796ZSB")
+"ENCFF616EWK","ENCFF662DYG","ENCFF796ZSB", "ENCFF832UUS")
 
 # The peak identities
 peakNames <- read.csv(paste0(fileNames[1], ".master_peak_list.bigbedfile1.pkidsort.tab"),  sep="\t")[,1]

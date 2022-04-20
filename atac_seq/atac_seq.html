@@ -176,7 +176,7 @@ pre code {
 <h3>Differential Analysis of ATAC-Seq data</h3>
 <pre class="r"><code># List of file prefixes
 fileNames &lt;- c(&quot;ENCFF181AMY&quot;,&quot;ENCFF255IVU&quot;,&quot;ENCFF343PTQ&quot;,&quot;ENCFF599ZDJ&quot;,
-&quot;ENCFF616EWK&quot;,&quot;ENCFF662DYG&quot;,&quot;ENCFF796ZSB&quot;)
+&quot;ENCFF616EWK&quot;,&quot;ENCFF662DYG&quot;,&quot;ENCFF796ZSB&quot;, &quot;ENCFF832UUS&quot;)
 
 # The peak identities
 peakNames &lt;- read.csv(paste0(fileNames[1], &quot;.master_peak_list.bigbedfile1.pkidsort.tab&quot;),  sep=&quot;\t&quot;)[,1]
@@ -197,13 +197,13 @@ head(all)</code></pre>
 ## chr10_100016484_100016707           0       10.40     9.97000           0
 ## chr10_100016944_100017094           0        0.00     0.00000           0
 ## chr10_100030961_100031111           0        0.00     3.63000           0
-##                           ENCFF616EWK ENCFF662DYG ENCFF796ZSB
-## chr10_100014895_100015045           0       0.000           0
-## chr10_100015422_100016135           0       3.900           0
-## chr10_100016150_100016380           0       7.640           0
-## chr10_100016484_100016707           0       5.675           0
-## chr10_100016944_100017094           0       0.000           0
-## chr10_100030961_100031111           0       0.000           0</code></pre>
+##                           ENCFF616EWK ENCFF662DYG ENCFF796ZSB ENCFF832UUS
+## chr10_100014895_100015045           0       0.000           0     0.00000
+## chr10_100015422_100016135           0       3.900           0     4.84837
+## chr10_100016150_100016380           0       7.640           0    23.20000
+## chr10_100016484_100016707           0       5.675           0     5.84000
+## chr10_100016944_100017094           0       0.000           0     3.02000
+## chr10_100030961_100031111           0       0.000           0     0.00000</code></pre>
 </div>
 
 
