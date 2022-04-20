@@ -1,0 +1,69 @@
+---
+title: "rna_seq_rsem"
+author: "Erica Ryu"
+date: "4/17/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The purpose of this script is to run DESeq2 using RSEM output files
+
+## load packages
+```{r}
+library(tximport)
+library(DESeq2)
+library(edgeR)
+library(limma)
+```
+
+
+### Import RSEM file and make count table
+```{r}
+dir <- "/Users/ericaryu/Documents/school_stuff/grad_school/PSU/classes/STAT555/project/data"
+files <- list.files(dir)
+file_dir <- file.path(dir, files)
+
+txi.rsem <- tximport(file_dir, type = "rsem", txIn = FALSE, txOut = FALSE)
+colnames(txi.rsem$counts) <- files
+head(txi.rsem$counts)
+
+```
+
+# make metadata table
+```{r}
+cells <- data.frame(cells = factor(c("HSC", "HSC", "ERY", "CMP", "CFUE", "CFUE", "CMP", "ERY")))
+rownames(cells) <- colnames(txi.rsem$counts)
+```
+
+# DESeq2 for 24 pair
+```{r}
+# subset metadata to the cell pair of interest
+cell_df_24 <- subset(cell_df, cells == "ERY" | cells == "CMP")
+# and subset the count table
+txi.rsem_24 <- txi.rsem
+txi.rsem_24$counts <- txi.rsem$counts[,which(colnames(txi.rsem$counts) %in% rownames(cell_df_24))] 
+
+#filter out genes with 0 length
+txi.rsem_24$abundance <-txi.rsem_24$abundance[apply(txi.rsem_24$length, 1, function(row) all(row !=0 )),]
+txi.rsem_24$counts <- txi.rsem_24$counts[apply(txi.rsem_24$length, 1, function(row) all(row !=0 )),]
+txi.rsem_24$length <- txi.rsem_24$length[apply(txi.rsem_24$length, 1, function(row) all(row !=0 )),]
+
+
+###### STOPPED HERE
+dds <- DESeqDataSetFromTximport(txi.rsem_24, cell_df_24, ~cells)
+```
+
+# limma-voom for 24 pair
+```{r}
+y <- DGEList(txi.rsem_24$counts)
+# filtering
+keep <- filterByExpr(y)
+y <- y[keep, ]
+y <- calcNormFactors(y)
+design <- model.matrix(~cells, data = cell_df_24)
+v <- voom(y, design)
+```
+

@@ -1,0 +1,66 @@
+#Load packages
+library(tximport)
+library(DESeq2)
+library(limma)
+library(tidyverse)
+library(RColorBrewer)
+library(pheatmap)
+library(tximport)
+library(jsonlite)
+library(ggplot2)
+library(ggrepel)
+library(readr)
+
+
+#Load data - Here I only uploaded the files I was going to analyze and named them accordingly
+dir <- "/Users/Dankvid/Desktop/stat"
+files <- list.files(dir, pattern = ".tsv")
+names(files) <- c("ERY", "CMP", "CMP", "ERY")
+head(files)
+txi.rsem <- tximport(files, type = "rsem", txIn = FALSE, txOut = FALSE)
+
+#Rewriting the tximport file (counts) into .csv files
+write.csv(txi.rsem$counts, file = "24counts.csv")
+data <- read.csv("24counts.csv", sep = ",", header = T, row.names = 1)
+
+#Loading data as a matrix and assigning each column a condition (con) for DESEQ2 labeling
+dt <- as.matrix(data) 
+group = data.frame(con = factor(c("ERY", "CMP","CMP", "ERY")))
+dds <- DESeqDataSetFromMatrix(countData = round(dt), colData = group, design = ~con)
+
+#Removing anything with zeros
+keep <- rowSums(counts(dds)) > 0
+dds1 <- dds[keep,]
+
+#Running DESEQ
+ddsDE1 <- DESeq(dds1)
+
+#Export normalized counts
+normCounts1 <- counts(ddsDE1, normalized = T)
+View(normCounts1)
+write.csv(normCounts1, "normalized_24pair.csv")
+
+#Looking at DESEQ significant results, reordering based on adjusted p-value
+res1 <- results(ddsDE1, alpha = 0.05)
+summary(res1)
+resOrdered1 <- res1[order(res1$padj),]
+write.csv(resOrdered1, "24pair.reordered.csv")
+resultsNames(ddsDE1)
+
+#step 8: MA plot x:mean gene exp, y:log fold,pval-sig in blue
+plotMA(ddsDE1,ylim = c(-8,8))
+
+#step 9: Heatmaps!
+norm1 <- read.csv("normalized_24pair.csv", row.names=1)
+deSeqRes24 <-read.csv("24pair.reordered.csv", row.names=1)
+deSeqRes24$sig<-ifelse(deSeqRes24$padj <= 0.05, "yes", "no")
+deSeqRes24<-na.omit(deSeqRes24)
+heatie_condition <- merge(norm1, deSeqRes24, by = 0)
+view(heatie_condition)
+HM <- heatie_condition[,2:5]
+row.names(HM_condition) <- heatie_condition$Row.names
+
+#The heatmap needs to be adjusted still
+pheatmap(log2(HM + 1), scale = 'row', 
+          show_rownames = F, treeheight_row = 0, 
+          treeheight_col = 0)

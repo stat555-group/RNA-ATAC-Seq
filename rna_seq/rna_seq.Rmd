@@ -8,105 +8,137 @@ output: html_document
 knitr::opts_chunk$set(warning = F, message = F)
 ```
 
-```{r}
-library(gplots)
-library(reshape2)
-library(RColorBrewer)
-library(plyr)
-library(lattice)
-library(genefilter)
-library(ggplot2)
-library(viridis)
-library(DESeq2)
-library(tidyr)
-library(biomaRt)
-```
+3 pairs of cell lines (1=HSC, 2=CMP, 3=CFUE, 4=Erythroblast)
 
-HTSeq function htseq-count was used to count reads. Counts for all samples were concatenated into the following text file: RNASeq_htseq_gene.txt
+Compare: 24,12,23 => CMP vs Erythroblast, HSC vs CMP, CMP vs CFUE : Use ScriptSeq data
 
-The phenotype information for the samples including case/control status in a text file : RNAseq_Info_Sheet.txt
+1. What genes are differentially expressed across each pair of cell lines?
+2. What are the functions of the genes with differential expression patterns?
+3. How consistent are the results between DEseq2 and limma voom?
+4. Construct a hierarchical tree using all the RNA-seq data, and perform clustering analysis. Describe the relationship based on your results.
+
+#wget https://bioconductor.org/packages/3.12/data/experiment/src/contrib/tximportData_1.18.0.tar.gz 
 
 ### Read Data files
 
 ```{r}
-pdata <- read.table('RNAseq_Info_Sheet.txt', sep='\t', header=TRUE)
-
-countdata <- read.table('RNASeq_htseq_gene.txt', sep='\t', header=TRUE)
-names(countdata) <- gsub('count_','',names(countdata))
-countdata <- countdata[,c('Gene',as.character(pdata$Sample))]
-row.names(countdata) <- countdata$Gene
+library(tximport)
+dir <- "~/Documents/Penn_State/Spring2022/STAT555/Project/RNA-ATAC-Seq/data/rna_seq/"
+coldata <- read.csv("../encode_ids.csv")
+samples <- coldata$Sample
+files <- paste0(dir, samples, ".tsv")
+names(files) <- samples
 ```
 
 
-### Case vs control samples
+```{r}
+#Read RSEM data
+txi.rsem <- tximport(files, type = "rsem", txIn = FALSE, txOut = FALSE)
+gene_counts <- txi.rsem$counts
+
+#filter out low count genes 
+keep <- rowSums(gene_counts)>=10
+gene_counts <- gene_counts[keep,]
+```
+
+
+### Gene Annotation
+```{r}
+library(dplyr)
+library(biomaRt)
+
+#Add genes to count_data
+count_data <- as.data.frame(gene_counts) %>% mutate_if(is.numeric, round)
+count_data$Gene <- sapply(strsplit(as.character(row.names(gene_counts)), '\\.'), '[[', 1)
+
+#Assign symbols with biomart
+mart <- useMart(biomart='ENSEMBL_MART_ENSEMBL',dataset='mmusculus_gene_ensembl')
+genes <- biomaRt::getBM(attribute=c('ensembl_gene_id', 'mgi_symbol'), values=count_data$Gene, mart=mart,useCache = FALSE)
+genes <- genes[!duplicated(genes$ensembl_gene_id),]
+
+#Merge with count data
+count_data <- merge(count_data, genes, by.x="Gene", by.y="ensembl_gene_id") %>% dplyr::rename("gene_symbol"="mgi_symbol")
+row.names(count_data) <- count_data$Gene
+count_data$gene_symbol[which(count_data$gene_symbol=='')] <- NA
+
+```
+
+
+
+### CMP vs Erythroblast cells
 
 ```{r}
 #Assign variables
-ctrl <- ""
-case <- ""
+cell1 <- "CMP"
+cell2 <- "Erythroblast"
 
-#Filter the info sheet for the two conditions being tested
-pdata_curr <- pdata[which(pdata$Status==case | pdata$Status==ctrl),]
-pdata_curr <- pdata_curr[order(as.character(pdata_curr$Sample)), ]
-pdata_curr$Status <- factor(pdata_curr$Status, levels = c(ctrl,case)) # make sure that control is being used as reference level (else DESeq2 does it alphabetically)
-rownames(pdata_curr) <- pdata_curr$Sample
-pdata_curr$Sample <- NULL
+#Filter coldata by conditions
+coldata_curr <- coldata[which(coldata$Status==cell1 | coldata$Status==cell2),]
+coldata_curr <- coldata_curr[order(as.character(coldata_curr$Sample)), ]
+coldata_curr$Status <- factor(coldata_curr$Status, levels = c(cell1,cell2)) 
+rownames(coldata_curr) <- coldata_curr$Sample
+coldata_curr$Sample <- NULL
 ```
 
-### DE analysis
+### DE analysis using DESEQ2
 
 ```{r, eval=T, echo=F, message=F}
 
 #subset countdata and pdata to 
-countdata_curr <- countdata[,which(colnames(countdata) %in% rownames(pdata_curr))] 
+countdata_curr <- count_data[,which(colnames(count_data) %in% rownames(coldata_curr))] 
 
 #columns must be ordered in the same way
 countdata_curr <- countdata_curr[ ,order(as.character(names(countdata_curr)))] 
 
-
-#filter out low count genes 
-keep <- rowSums(countdata_curr)>=10
-countdata_curr <- countdata_curr[keep,]
-
-#get deseq model
-ddsFullCountTable <- DESeqDataSetFromMatrix(countData = countdata_curr, coldata = pdata_curr, design = ~ Status)
-
-#analysis
+library(DESeq2)
+ddsFullCountTable <- DESeqDataSetFromMatrix(countData = countdata_curr, colData = coldata_curr, design = ~ Status)
 dds <- DESeq(ddsFullCountTable)
-
 #normalized counts
 dds_count <- counts(dds, normalize=T)
+```
 
+```{r}
 # output results
 res <- results(dds, cooksCutoff=FALSE, independentFiltering=FALSE)
 res$gene_id <- row.names(res) 
 
 # add gene symbols for DE results
 res_df <- as.data.frame(res)
-res_df <- merge(countdata[which(countdata$Gene%in%res_df$gene_id),c("Gene","gene_symbol")],res_df,by.x="Gene",by.y="gene_id")
+res_df <- merge(count_data[which(count_data$Gene%in%res_df$gene_id),c("Gene","gene_symbol")],res_df,by.x="Gene",by.y="gene_id")
 res_df <- res_df[order(res_df$pvalue, decreasing=FALSE),]
-  
+```
+
+### MA plot
+
+```{r, eval=T, echo=F}
+plotMA(dds,ylim=c(-2,2))
+```
+
+### Distribution of adjusted p-values
+
+```{r, eval=T, echo=F}
+hist(res$padj, main=" ", xlab="adjusted p-value", breaks=50, col="deepskyblue4", xaxp  = c(0, 1, 20))
 ```
 
 ### Heatmap
 
-```{r}
-#rlog transformations - to use for heatmap and PCA plot
-rld<- rlogTransformation(dds, blind=FALSE)
+```{r fig.height=10, fig.width=12}
+library(gplots)
+library(viridis)
 
 #assign colors
 colour_status <- c("navy","red")
-names(colour_status) <- c(ctrl,case) 
-colour_status_list <- unlist(lapply(pdata_curr$Status,function(x){colour_status[x]}))
+names(colour_status) <- c(cell1,cell2) 
+colour_status_list <- unlist(lapply(coldata_curr$Status,function(x){colour_status[x]}))
 
 make_heatmap <- function(df){
   #Log2 of counts
   mat = log2(dds_count+1)
   
   #Top 20 genes
-  top.mat <- m[rownames(m)%in%tb[1:20,"Gene"],] 
-  array_name <- colnames(m)
-  gene_symbol=df[1:20,"gene_symbol"]
+  top.mat <- mat[rownames(mat)%in%df[1:50,"Gene"],] 
+  array_name <- colnames(mat)
+  gene_symbol=df[1:50,"gene_symbol"]
   
   #Make heatmap
   heatmap.2(na.omit(top.mat), col=viridis(256, option="B"),
@@ -119,23 +151,81 @@ make_heatmap <- function(df){
     main="")
   legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.8) #use list of assigned colors
 }
+
+make_heatmap(res_df)
 ```
 
 ### Volcano Plot
 
 ```{r}
-volcanoplot <- ggplot(res_df, aes(x=log2FoldChange, y=-log10(pvalue), col = Expression, label = label))+
-  geom_point()+
-  theme_classic()+
-  theme(text = element_text(size = 20, family = "Arial", color = "black"))+
+library(ggplot2)
+
+ggplot(res_df, aes(x=log2FoldChange, y=-log10(padj))) + geom_point(size=0.5) +
   geom_vline(xintercept=c(-1, 1), col="grey", linetype = "dashed") +
   geom_hline(yintercept=-log10(0.05), col="grey", linetype = "dashed")+
   scale_color_manual(values = c("blue", "grey", "red"))+
   xlim(-4, 4)+
-  geom_text_repel(aes(fontface = "bold"))+
-  theme(legend.position = "top")+
-  labs(x=expression(log[2](Fold~change)), y=expression(-log[10](p-value)))
+  geom_text(aes(fontface = "bold"))+
+  theme_classic()+
+  theme(legend.position = "top", axis.title = element_text(size = 20, family = "Arial", color = "black"))
+  #labs(x=expression(log[2](Fold~change)), y=expression(-log[10](p-value)))
 
-volcanoplot
+```
+
+_____
+
+### DE analysis using limma voom
+
+```{r}
+library(edgeR)
+status_df <- coldata %>% dplyr::filter(Sample %in% colnames(countdata_curr))
+status_df <- status_df[match(names(countdata_curr), status_df$Sample),]
+celltypes <- as.vector(status_df$Status)
+
+#Create DEGlist object
+deg <- DGEList(countdata_curr)
+
+#Get normalization factors
+td <- calcNormFactors(deg)
+```
+
+### Voom transformation, calculation of variance
+
+```{r}
+modmat <- model.matrix(~0 + celltypes)
+mv <- voom(td, modmat, plot = T)
+```
+
+### Fitting a linear model
+
+```{r}
+fitmod <- lmFit(mv, modmat)
+head(coef(fitmod))
+```
+
+### Make contrasts
+
+```{r}
+contrast <- makeContrasts(celltypesCMP - celltypesErythroblast, levels = colnames(coef(fitmod)))
+
+#estimate contrasts for each gene and apply eBayes
+estcont <- eBayes(contrasts.fit(fitmod, contrast))
+
+#See diff expression results
+top.table <- topTable(estcont, sort.by = "P", n = Inf)
+top.table$Gene <- row.names(top.table)
+
+#Add gene symbol
+res_vdf <- merge(top.table, genes, by.x="Gene", by.y="ensembl_gene_id") %>% dplyr::rename("gene_symbol"="mgi_symbol")
+row.names(res_vdf) <- res_vdf$Gene
+res_vdf$gene_symbol[which(res_vdf$gene_symbol=='')] <- NA
+
+#View results
+res_vdf
+```
+### Heatmap for limma voom
+
+```{r fig.height=10, fig.width=12}
+make_heatmap(res_vdf)
 ```
 
