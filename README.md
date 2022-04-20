@@ -5,8 +5,6 @@ cell lines (1=HSC, 2=CMP, 3=CFUE, 4=Erythroblast)
 Assigned Sample pairs:
 24; 12; 23; 14; 34; 13; 
 
-Link to report and presentation files: https://drive.google.com/drive/folders/1Eh5B0T7f-u1rsbnxDOqCfe0Izag4CWAw?usp=sharing
-
 ## Downloading the Data 
 First, create a ```data``` directory that contains the folders ```rna_seq``` and ``atac_seq``.
 
