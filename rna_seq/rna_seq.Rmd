@@ -8,19 +8,6 @@ output: html_document
 knitr::opts_chunk$set(warning = F, message = F)
 ```
 
-```{r}
-library(gplots)
-library(reshape2)
-library(RColorBrewer)
-library(plyr)
-library(lattice)
-library(genefilter)
-library(ggplot2)
-library(viridis)
-library(tidyr)
-library(biomaRt)
-```
-
 3 pairs of cell lines (1=HSC, 2=CMP, 3=CFUE, 4=Erythroblast)
 
 Compare: 24,12,23 => CMP vs Erythroblast, HSC vs CMP, CMP vs CFUE : Use ScriptSeq data
