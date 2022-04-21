@@ -1,0 +1,9 @@
+﻿Sample,Condition,Replicate,Peaks
+ENCFF662DYG,HSC,1,/Users/avantikadiwadkar/Documents/Penn_State/Spring2022/STAT555/Project/RNA-ATAC-Seq/atac_seq/bedfiles/ENCFF662DYG.bed
+ENCFF255IVU,HSC,2,/Users/avantikadiwadkar/Documents/Penn_State/Spring2022/STAT555/Project/RNA-ATAC-Seq/atac_seq/bedfiles/ENCFF255IVU.bed
+ENCFF832UUS,CMP,1,/Users/avantikadiwadkar/Documents/Penn_State/Spring2022/STAT555/Project/RNA-ATAC-Seq/atac_seq/bedfiles/ENCFF832UUS.bed
+ENCFF343PTQ,CMP,2,/Users/avantikadiwadkar/Documents/Penn_State/Spring2022/STAT555/Project/RNA-ATAC-Seq/atac_seq/bedfiles/ENCFF343PTQ.bed
+ENCFF796ZSB,CFUE,1,/Users/avantikadiwadkar/Documents/Penn_State/Spring2022/STAT555/Project/RNA-ATAC-Seq/atac_seq/bedfiles/ENCFF796ZSB.bed
+ENCFF599ZDJ,CFUE,2,/Users/avantikadiwadkar/Documents/Penn_State/Spring2022/STAT555/Project/RNA-ATAC-Seq/atac_seq/bedfiles/ENCFF599ZDJ.bed
+ENCFF181AMY,Erythroblast,1,/Users/avantikadiwadkar/Documents/Penn_State/Spring2022/STAT555/Project/RNA-ATAC-Seq/atac_seq/bedfiles/ENCFF181AMY.bed
+ENCFF616EWK,Erythroblast,2,/Users/avantikadiwadkar/Documents/Penn_State/Spring2022/STAT555/Project/RNA-ATAC-Seq/atac_seq/bedfiles/ENCFF616EWK.bed
