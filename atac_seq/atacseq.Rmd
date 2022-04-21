@@ -1,0 +1,149 @@
+---
+title: 'STAT555 Project : ATAC-Seq Analysis'
+author: "Avantika Diwadkar"
+date: "4/20/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = F)
+```
+
+### Libraries
+
+```{r}
+library(GenomicRanges)
+library(dplyr)
+```
+
+### Read in the sample info file created 
+
+Tutorial: https://rockefelleruniversity.github.io/RU_ATAC_Workshop.html 
+
+3 pairs of cell lines (1=HSC, 2=CMP, 3=CFUE, 4=Erythroblast)
+
+Compare: 24,12,23 => CMP vs Erythroblast, HSC vs CMP, CMP vs CFUE
+
+5. What regions have differential chromatin patterns across each pair of cell lines? What are the genes near these regions?
+6. How are differential chromatin patterns related to the expression patterns of nearby genes?
+7. What are the functions of the genes with differential chromatin patterns?
+8. Construct a hierarchical tree using all the ATAC-seq data and use clustering analysis to explore the pattern of cell-line specified genes. Do you get the same structure as the tree from RNA-seq data?
+
+## Read in sample data 
+
+```{r}
+sample_info <- read.csv("atac_seq_sample_sheet.csv")
+```
+
+
+## Read in consensus (merged) peak intensity files generated with convert_atac_seq.sh script
+
+```{r}
+# List of file prefixes
+fileNames <- c("ENCFF181AMY","ENCFF255IVU","ENCFF343PTQ","ENCFF599ZDJ",
+"ENCFF616EWK","ENCFF662DYG","ENCFF796ZSB", "ENCFF832UUS")
+
+# The peak identities
+peakNames <- read.csv(paste0("bwfiles/",fileNames[1], ".master_peak_list.bigbedfile1.pkidsort.tab"),  sep="\t")[,1]
+
+# Get column 6 from each of the files
+cols <- c()
+ for (file in fileNames){
+   cols <- cbind(cols, read.csv(paste0("bwfiles/",file, ".master_peak_list.bigbedfile1.pkidsort.tab"),  sep="\t")[,6])
+ }
+```
+
+```{r}
+# Turn it into a data frame and add row names and column names
+all <- data.frame(cols, row.names = peakNames)
+colnames(all) <- fileNames
+
+#Re-order columns and convert to integer
+myCounts <- all[,as.vector(sample_info$Sample)] %>% mutate_if(is.numeric, round)
+Group <- factor(as.vector(sample_info$Condition))
+
+#View
+head(myCounts)
+```
+
+
+## Differential ATAC-Seq analysis
+
+The presense or absense of a peak does not fully capture the changes in ATAC-seq signal. Identifying changes in signal within peaks will allow us to better capture ATAC-seq signal differences across the celltypes.
+
+### DESEQ2 Analysis
+
+```{r}
+library(DESeq2)
+
+metaData <- data.frame(Group, row.names = colnames(myCounts))
+atacDDS_table <- DESeqDataSetFromMatrix(myCounts, metaData, ~Group) #rowRanges = consensusToCount
+atacDDS <- DESeq(atacDDS_table)
+```
+
+
+### PCA Plot
+
+```{r}
+atac_Rlog <- rlog(atacDDS)
+plotPCA(atac_Rlog, intgroup = "Group", ntop = nrow(atac_Rlog))
+```
+
+### CMP vs Erythroblasts : comparison 1
+
+```{r}
+library(BSgenome.Mmusculus.UCSC.mm10)
+library(tracktables)
+
+# mcols(atacDDS) <- cbind(mcols(atacDDS), )
+# res <- results(atacDDS)
+# res$rowRanges <- mcols(atacDDS)$
+
+ErythroMinusCMP <- results(atacDDS, c("Group", "Erythroblast", "CMP"), format = "DataFrame") #, format = "GRangesList"
+ErythroMinusCMP$peaks <- row.names(ErythroMinusCMP) 
+ErythroMinusCMP <- ErythroMinusCMP[order(ErythroMinusCMP$pvalue),]
+ErythroMinusCMP
+```
+
+
+### Annotation of differential regions for comparison 1
+
+```{r}
+library(clusterProfiler)
+library(ChIPseeker)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(EnsDb.Mmusculus.v79)
+
+#Convert to GRanges
+ErythroMinusCMPGR <- makeGRangesFromDataFrame(as.data.frame(ErythroMinusCMP) %>% separate(peaks, c("Chr", "Start", "Stop")),keep.extra.columns=TRUE)
+
+#Annotate peaks
+anno_ErythroMinusCMP <- annotatePeak(ErythroMinusCMPGR, TxDb = TxDb.Mmusculus.UCSC.mm10.knownGene)
+```
+
+
+### Get gene symbol for transcript ID
+
+```{r}
+anno_ErythroMinusCMP_df <- as.data.frame(as.GRanges(anno_ErythroMinusCMP))
+anno_ErythroMinusCMP_df$Gene <- sapply(strsplit(as.character(anno_ErythroMinusCMP_df$transcriptId), '\\.'), '[[', 1)
+
+#Assign symbols with biomart
+library(biomaRt)
+mart <- useMart(biomart='ENSEMBL_MART_ENSEMBL',dataset='mmusculus_gene_ensembl')
+genes <- biomaRt::getBM(attribute=c('ensembl_transcript_id', 'mgi_symbol'), values=anno_ErythroMinusCMP_df$Gene, mart=mart,useCache = FALSE)
+genes <- genes[!duplicated(genes$ensembl_transcript_id),]
+
+#Merge with count data
+anno_ErythroMinusCMP_df <- merge(anno_ErythroMinusCMP_df, genes, by.x="Gene", by.y="ensembl_transcript_id") %>% dplyr::rename("gene_symbol"="mgi_symbol")
+anno_ErythroMinusCMP_df$gene_symbol[which(anno_ErythroMinusCMP_df$gene_symbol=='')] <- NA
+```
+
+
+### Final results
+
+```{r}
+#View
+anno_ErythroMinusCMP_df
+```
+
