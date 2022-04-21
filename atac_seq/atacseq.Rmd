@@ -14,6 +14,17 @@ knitr::opts_chunk$set(warning = F, message = F)
 ```{r}
 library(GenomicRanges)
 library(dplyr)
+library(tidyr)
+library(DESeq2)
+library(BSgenome.Mmusculus.UCSC.mm10)
+#library(tracktables)
+library(clusterProfiler)
+library(ChIPseeker)
+library(TxDb.Mmusculus.UCSC.mm10.knownGene)
+library(biomaRt)
+mart <- useMart(biomart='ENSEMBL_MART_ENSEMBL',dataset='mmusculus_gene_ensembl')
+library(gplots)
+library(viridis)
 ```
 
 ### Read in the sample info file created 
@@ -74,11 +85,15 @@ The presense or absense of a peak does not fully capture the changes in ATAC-seq
 ### DESEQ2 Analysis
 
 ```{r}
-library(DESeq2)
-
+#Set Group
 metaData <- data.frame(Group, row.names = colnames(myCounts))
+metaData$Group <- factor(metaData$Group, levels = c("HSC","CMP","CFUE","Erythroblast")) #set order 
+
 atacDDS_table <- DESeqDataSetFromMatrix(myCounts, metaData, ~Group) #rowRanges = consensusToCount
 atacDDS <- DESeq(atacDDS_table)
+
+#normalized counts
+atacDDS_count <- counts(atacDDS, normalize=T)
 ```
 
 
@@ -92,28 +107,18 @@ plotPCA(atac_Rlog, intgroup = "Group", ntop = nrow(atac_Rlog))
 ### CMP vs Erythroblasts : comparison 1
 
 ```{r}
-library(BSgenome.Mmusculus.UCSC.mm10)
-library(tracktables)
+cell1 <- "CMP"
+cell2 <- "Erythroblast"
 
-# mcols(atacDDS) <- cbind(mcols(atacDDS), )
-# res <- results(atacDDS)
-# res$rowRanges <- mcols(atacDDS)$
-
-ErythroMinusCMP <- results(atacDDS, c("Group", "Erythroblast", "CMP"), format = "DataFrame") #, format = "GRangesList"
+ErythroMinusCMP <- results(atacDDS, c("Group", cell2 , cell1), format = "DataFrame") #CMP is the control base tissue similar to RNASeq
 ErythroMinusCMP$peaks <- row.names(ErythroMinusCMP) 
 ErythroMinusCMP <- ErythroMinusCMP[order(ErythroMinusCMP$pvalue),]
-ErythroMinusCMP
 ```
 
 
 ### Annotation of differential regions for comparison 1
 
 ```{r}
-library(clusterProfiler)
-library(ChIPseeker)
-library(TxDb.Mmusculus.UCSC.mm10.knownGene)
-library(EnsDb.Mmusculus.v79)
-
 #Convert to GRanges
 ErythroMinusCMPGR <- makeGRangesFromDataFrame(as.data.frame(ErythroMinusCMP) %>% separate(peaks, c("Chr", "Start", "Stop")),keep.extra.columns=TRUE)
 
@@ -129,8 +134,7 @@ anno_ErythroMinusCMP_df <- as.data.frame(as.GRanges(anno_ErythroMinusCMP))
 anno_ErythroMinusCMP_df$Gene <- sapply(strsplit(as.character(anno_ErythroMinusCMP_df$transcriptId), '\\.'), '[[', 1)
 
 #Assign symbols with biomart
-library(biomaRt)
-mart <- useMart(biomart='ENSEMBL_MART_ENSEMBL',dataset='mmusculus_gene_ensembl')
+#mart <- useEnsembl(biomart='ENSEMBL_MART_ENSEMBL',dataset='mmusculus_gene_ensembl',mirror = "useast")
 genes <- biomaRt::getBM(attribute=c('ensembl_transcript_id', 'mgi_symbol'), values=anno_ErythroMinusCMP_df$Gene, mart=mart,useCache = FALSE)
 genes <- genes[!duplicated(genes$ensembl_transcript_id),]
 
@@ -143,7 +147,180 @@ anno_ErythroMinusCMP_df$gene_symbol[which(anno_ErythroMinusCMP_df$gene_symbol=='
 ### Final results
 
 ```{r}
-#View
-anno_ErythroMinusCMP_df
+#Filter by significance, distance to TSS and FC
+ErythroMinusCMP_results <- anno_ErythroMinusCMP_df %>% dplyr::filter(pvalue < 0.05, abs(distanceToTSS) < 5000, abs(log2FoldChange) > 0) %>% dplyr::arrange(pvalue)
+
+#Add peaks
+ErythroMinusCMP_results$Peak <- as.character(paste0(ErythroMinusCMP_results$seqnames,"_",ErythroMinusCMP_results$start,"_",ErythroMinusCMP_results$end))
+
+#Save results
+write.csv(ErythroMinusCMP_results, "results/ErythrovsCMP_atacseq_sigpval_5kb_logFC.csv", row.names=F,quote = F)
 ```
 
+## Heatmap 
+
+```{r fig.height=10, fig.width=12}
+make_heatmap <- function(df, coldata){
+    
+  #Log2 of counts
+  norm_counts = log2(atacDDS_count+1)
+  mat <- norm_counts[, row.names(coldata)]
+  
+  #Top 50 genes
+  top.mat <- mat[rownames(mat)%in%df[1:20,"Peak"],] 
+  array_name <- colnames(mat)
+  gene_symbol=df[1:20,"gene_symbol"]
+  
+  #assign colors
+  colour_status <- c("navy","red")
+  names(colour_status) <- as.vector(unique(coldata$Group))
+  colour_status_list <- unlist(lapply(as.vector(coldata$Group),function(x){colour_status[x]}))
+  
+  #Make heatmap
+  heatmap.2(na.omit(top.mat), col=viridis(256, option="B"),
+    ColSideColors=colour_status_list, #use list of assigned colors
+    labCol=array_name, labRow=gene_symbol, 
+    trace="none",
+    margins=c(12,20), 
+    cexRow=1,cexCol=1,
+    keysize=1.5,key.title=NA,key.xlab="Log2-normalized counts",key.ylab="Counts",
+    main="")
+  legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.8) #use list of assigned colors
+}
+
+```
+
+
+```{r fig.height=8, fig.width=8}
+#Filter data for cell types
+coldata <- metaData %>% dplyr::filter(Group %in% c(cell1,cell2))
+make_heatmap(ErythroMinusCMP_results, coldata)
+```
+
+____
+
+### HSC vs CMP : comparison 2
+
+```{r}
+cell1 <- "HSC"
+cell2 <- "CMP"
+
+CMPMinusHSC <- results(atacDDS, c("Group", cell2 , cell1), format = "DataFrame") #HSC is control baseline
+CMPMinusHSC$peaks <- row.names(CMPMinusHSC) 
+CMPMinusHSC <- CMPMinusHSC[order(CMPMinusHSC$pvalue),]
+```
+
+
+### Annotation of differential regions for comparison 2
+
+```{r}
+#Convert to GRanges
+CMPMinusHSCGR <- makeGRangesFromDataFrame(as.data.frame(CMPMinusHSC) %>% separate(peaks, c("Chr", "Start", "Stop")),keep.extra.columns=TRUE)
+
+#Annotate peaks
+anno_CMPMinusHSC <- annotatePeak(CMPMinusHSCGR, TxDb = TxDb.Mmusculus.UCSC.mm10.knownGene)
+```
+
+
+### Get gene symbol for transcript ID
+
+```{r}
+anno_CMPMinusHSC_df <- as.data.frame(as.GRanges(anno_CMPMinusHSC))
+anno_CMPMinusHSC_df$Gene <- sapply(strsplit(as.character(anno_CMPMinusHSC_df$transcriptId), '\\.'), '[[', 1)
+
+#Assign symbols with biomart
+#mart <- useEnsembl(biomart='ENSEMBL_MART_ENSEMBL',dataset='mmusculus_gene_ensembl',mirror = "useast")
+genes <- biomaRt::getBM(attribute=c('ensembl_transcript_id', 'mgi_symbol'), values=anno_CMPMinusHSC_df$Gene, mart=mart,useCache = FALSE)
+genes <- genes[!duplicated(genes$ensembl_transcript_id),]
+
+#Merge with count data
+anno_CMPMinusHSC_df <- merge(anno_CMPMinusHSC_df, genes, by.x="Gene", by.y="ensembl_transcript_id") %>% dplyr::rename("gene_symbol"="mgi_symbol")
+anno_CMPMinusHSC_df$gene_symbol[which(anno_CMPMinusHSC_df$gene_symbol=='')] <- NA
+```
+
+
+### Final results
+
+```{r}
+#Filter by significance, distance to TSS and FC
+CMPMinusHSC_results <- anno_CMPMinusHSC_df %>% dplyr::filter(pvalue < 0.05, abs(distanceToTSS) < 5000, abs(log2FoldChange) > 0) %>% dplyr::arrange(pvalue)
+
+#Add peaks
+CMPMinusHSC_results$Peak <- as.character(paste0(CMPMinusHSC_results$seqnames,"_",CMPMinusHSC_results$start,"_",CMPMinusHSC_results$end))
+
+#Save results
+write.csv(CMPMinusHSC_results, "results/CMPvsHSC_atacseq_sigpval_5kb_logFC.csv", row.names=F,quote = F)
+
+```
+
+## Heatmap 
+
+```{r fig.height=8, fig.width=8}
+#Filter data for cell types
+coldata <- metaData %>% dplyr::filter(Group %in% c(cell1,cell2))
+make_heatmap(CMPMinusHSC_results, coldata)
+```
+
+____
+
+### CMP vs CFUE : comparison 3
+
+```{r}
+cell1 <- "CMP"
+cell2 <- "CFUE"
+
+CFUEMinusCMP <- results(atacDDS, c("Group", cell2 , cell1), format = "DataFrame") #CMP is control baseline
+CFUEMinusCMP$peaks <- row.names(CFUEMinusCMP) 
+CFUEMinusCMP <- CFUEMinusCMP[order(CFUEMinusCMP$pvalue),]
+```
+
+
+### Annotation of differential regions for comparison 2
+
+```{r}
+#Convert to GRanges
+CFUEMinusCMPGR <- makeGRangesFromDataFrame(as.data.frame(CFUEMinusCMP) %>% separate(peaks, c("Chr", "Start", "Stop")),keep.extra.columns=TRUE)
+
+#Annotate peaks
+anno_CFUEMinusCMP <- annotatePeak(CFUEMinusCMPGR, TxDb = TxDb.Mmusculus.UCSC.mm10.knownGene)
+```
+
+
+### Get gene symbol for transcript ID
+
+```{r}
+anno_CFUEMinusCMP_df <- as.data.frame(as.GRanges(anno_CFUEMinusCMP))
+anno_CFUEMinusCMP_df$Gene <- sapply(strsplit(as.character(anno_CFUEMinusCMP_df$transcriptId), '\\.'), '[[', 1)
+
+#Assign symbols with biomart
+#mart <- useEnsembl(biomart='ENSEMBL_MART_ENSEMBL',dataset='mmusculus_gene_ensembl',mirror = "useast")
+genes <- biomaRt::getBM(attribute=c('ensembl_transcript_id', 'mgi_symbol'), values=anno_CFUEMinusCMP_df$Gene, mart=mart,useCache = FALSE)
+genes <- genes[!duplicated(genes$ensembl_transcript_id),]
+
+#Merge with count data
+anno_CFUEMinusCMP_df <- merge(anno_CFUEMinusCMP_df, genes, by.x="Gene", by.y="ensembl_transcript_id") %>% dplyr::rename("gene_symbol"="mgi_symbol")
+anno_CFUEMinusCMP_df$gene_symbol[which(anno_CFUEMinusCMP_df$gene_symbol=='')] <- NA
+```
+
+
+### Final results
+
+```{r}
+#Filter by significance, distance to TSS and FC
+CFUEMinusCMP_results <- anno_CFUEMinusCMP_df %>% dplyr::filter(pvalue < 0.05, abs(distanceToTSS) < 5000, abs(log2FoldChange) > 0) %>% dplyr::arrange(pvalue)
+
+#Add peaks
+CFUEMinusCMP_results$Peak <- as.character(paste0(CFUEMinusCMP_results$seqnames,"_",CFUEMinusCMP_results$start,"_",CFUEMinusCMP_results$end))
+
+#Save results
+write.csv(CFUEMinusCMP_results, "results/CFUEvsCMP_atacseq_sigpval_5kb_logFC.csv", row.names=F,quote = F)
+
+```
+
+## Heatmap 
+
+```{r fig.height=8, fig.width=8}
+#Filter data for cell types
+coldata <- metaData %>% dplyr::filter(Group %in% c(cell1,cell2))
+make_heatmap(CFUEMinusCMP_results, coldata)
+```
