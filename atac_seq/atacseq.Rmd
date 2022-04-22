@@ -2,7 +2,7 @@
 title: 'STAT555 Project : ATAC-Seq Analysis'
 author: "Avantika Diwadkar"
 date: "4/20/2022"
-output: rmarkdown::github_document
+output: html_document
 always_allow_html: true
 ---
 
