@@ -23,8 +23,8 @@ Compare: 24,12,23 => CMP vs Erythroblast, HSC vs CMP, CMP vs CFUE : Use ScriptSe
 
 ```{r}
 library(tximport)
-dir <- "~/Documents/Penn_State/Spring2022/STAT555/Project/RNA-ATAC-Seq/data/rna_seq/"
-coldata <- read.csv("../encode_ids.csv")
+dir <- "../data/rna_seq/"
+coldata <- read.csv("encode_ids.csv")
 samples <- coldata$Sample
 files <- paste0(dir, samples, ".tsv")
 names(files) <- samples
@@ -171,7 +171,43 @@ ggplot(res_df, aes(x=log2FoldChange, y=-log10(padj))) + geom_point(size=0.5) +
   #labs(x=expression(log[2](Fold~change)), y=expression(-log[10](p-value)))
 
 ```
+```{r}
+go_enrichment <- function(df) {
 
+  # we want the log2 fold change 
+  original_gene_list <- df$log2FoldChange
+  
+  # name the vector
+  names(original_gene_list) <- df$gene_id
+  
+  # omit any NA values 
+  gene_list<-na.omit(original_gene_list)
+  
+  # sort the list in decreasing order (required for clusterProfiler)
+  gene_list = sort(gene_list, decreasing = TRUE)
+  
+  gse <- gseGO(geneList=gene_list, 
+               keyType = "ENSEMBL", 
+               nPerm = 10000, 
+               minGSSize = 3, 
+               maxGSSize = 800, 
+               pvalueCutoff = 0.05, 
+               verbose = TRUE, 
+               OrgDb = org.Mm.eg.db, 
+               pAdjustMethod = "none")
+  return(gse)
+}
+```
+
+```{r}
+CMP_vs_ETH <- go_enrichment(res)
+
+png(file="CMP vs ETH_go_rna_seq.png",
+width=5000, height=3500, res=400)
+dotplot(CMP_vs_ETH, showCategory=10, split=".sign",
+        title="CMP vs ETH") + facet_grid(.~.sign)
+dev.off()
+```
 _____
 
 ### DE analysis using limma voom
