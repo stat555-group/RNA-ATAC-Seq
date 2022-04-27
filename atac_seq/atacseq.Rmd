@@ -159,6 +159,9 @@ ErythroMinusCMP_results$Peak <- as.character(paste0(ErythroMinusCMP_results$seqn
 write.csv2(ErythroMinusCMP_results, "ErythrovsCMP_atacseq_sigpval_5kb_logFC.tab", row.names=F,quote = F, sep = "\t")
 ```
 
+```{r}
+
+```
 ### Heatmap 
 
 ```{r fig.height=10, fig.width=12}
@@ -184,7 +187,8 @@ make_heatmap <- function(df, coldata){
     labCol=array_name, labRow=gene_symbol, 
     trace="none",
     margins=c(12,20), 
-    cexRow=1,cexCol=1,
+    cexRow=1,
+    cexCol=1,
     keysize=1.5,key.title=NA,key.xlab="Log2-normalized counts",key.ylab="Counts",
     main="")
   legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.8) #use list of assigned colors
@@ -200,10 +204,48 @@ make_heatmap(ErythroMinusCMP_results, coldata)
 ```
 ### GO Enrichment
 ```{r}
-go1 <- enrichGO(as.data.frame(as.GRanges(anno_ErythroMinusCMP)[as.GRanges(anno_ErythroMinusCMP)$log2FoldChange > 0])$geneId, OrgDb = "org.Mm.eg.db", ont = "BP", maxGSSize = 5000)
 
-head(go1, 10) %>% dplyr::select(ID, Description, pvalue, p.adjust) %>% datatable(elementId = "goEle1")
+cmp_vs_eth <- ErythroMinusCMP_results
+
+# we want the log2 fold change 
+original_gene_list <- cmp_vs_eth$log2FoldChange
+
+# name the vector
+names(original_gene_list) <- cmp_vs_eth$geneId
+
+# omit any NA values 
+gene_list<-na.omit(original_gene_list)
+
+# sort the list in decreasing order (required for clusterProfiler)
+gene_list = sort(gene_list, decreasing = TRUE)
+#cmp_vs_eth <- sort(as.data.frame(as.GRanges(anno_ErythroMinusCMP)[as.GRanges(anno_ErythroMinusCMP)$log2FoldChange > 0])$geneId, decreasing = TRUE)
+
+#gse <- gseGO(cmp_vs_eth, OrgDb = "org.Mm.eg.db", ont = "BP", maxGSSize = 500, keyType  = "ENTREZID")
+             
+#go1 <- enrichGO(as.data.frame(as.GRanges(anno_ErythroMinusCMP)[as.GRanges(anno_ErythroMinusCMP)$log2FoldChange > 0])$geneId, OrgDb = "org.Mm.eg.db", ont = "BP", maxGSSize = 5000)
+
+#head(go1, 10) %>% dplyr::select(ID, Description, pvalue, p.adjust) %>% datatable(elementId = "goEle1")
 ```
+```{r}
+gse <- gseGO(geneList=gene_list, 
+             ont ="ALL", 
+             keyType = "ENTREZID", 
+             nPerm = 10000, 
+             minGSSize = 3, 
+             maxGSSize = 800, 
+             pvalueCutoff = 0.05, 
+             verbose = TRUE, 
+             OrgDb = org.Mm.eg.db, 
+             pAdjustMethod = "none")
+```
+```{r}
+png(file="CMP_vs_Erythroblasts_go.png",
+width=900, height=350)
+dotplot(gse, showCategory=10, split=".sign",
+        title="CMP vs Erythroblasts")
+dev.off()
+```
+
 ____
 
 ## HSC vs CMP : comparison 2
