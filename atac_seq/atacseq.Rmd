@@ -207,7 +207,6 @@ make_heatmap(ErythroMinusCMP_results, coldata)
 
 ```{r}
 go_enrichment <- function(df) {
-  cmp_vs_eth <- ErythroMinusCMP_results
 
   # we want the log2 fold change 
   original_gene_list <- df$log2FoldChange
@@ -222,7 +221,6 @@ go_enrichment <- function(df) {
   gene_list = sort(gene_list, decreasing = TRUE)
   
   gse <- gseGO(geneList=gene_list, 
-               ont ="ALL", 
                keyType = "ENTREZID", 
                nPerm = 10000, 
                minGSSize = 3, 
@@ -390,7 +388,39 @@ make_heatmap(CFUEMinusCMP_results, coldata)
 
 ### GO Enrichment
 ```{r}
-go3 <- enrichGO(as.data.frame(as.GRanges(anno_CFUEMinusCMP)[as.GRanges(anno_CFUEMinusCMP)$log2FoldChange > 0])$geneId, OrgDb = "org.Mm.eg.db", ont = "BP", maxGSSize = 5000)
+CMP_vs_CFUE <- go_enrichment(CFUEMinusCMP_results)
 
-head(go3, 10) %>% dplyr::select(ID, Description, pvalue, p.adjust) %>% datatable(elementId = "goEle1")
+png(file="CMP_vs_CFUE_go.png",
+width=5000, height=3500, res=400)
+dotplot(CMP_vs_CFUE, showCategory=10, split=".sign",
+        title="CMP vs CFUE") + facet_grid(.~.sign)
+dev.off()
+```
+
+```{r}
+eth_cmp <- c()
+
+for (i in ErythroMinusCMP_results$annotation[ErythroMinusCMP_results$pvalue < 0.05]){
+  eth_cmp <- c(eth_cmp,strsplit(i,split="[()]")[[1]][1])
+}
+
+hsc_vs_hsc <- c()
+for (i in CMPMinusHSC_results$annotation[CMPMinusHSC_results$pvalue < 0.05]){
+  hsc_vs_hsc <- c(hsc_vs_hsc,strsplit(i,split="[()]")[[1]][1])
+}
+
+cfue_vs_cmp <- c()
+for (i in CFUEMinusCMP_results$annotation[CFUEMinusCMP_results$pvalue < 0.05]){
+  cfue_vs_cmp <- c(cfue_vs_cmp,strsplit(i,split="[()]")[[1]][1])
+}
+
+stuff <- rbind(table(cfue_vs_cmp), table(hsc_vs_hsc))
+stuff <- rbind(table(eth_cmp), stuff)
+
+png(file="atac_regions_go.png",
+width=3000, height=3000, res=400)
+barplot(stuff, beside=TRUE, col = c("Red", "blue", "black"))
+legend("topleft", legend=c("CMP vs Erythroblasts", "CMP vs CFUE", "HSC vs CMP"),
+        fill = c("Red", "blue", "black"), cex=0.8)
+dev.off()
 ```
