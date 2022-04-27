@@ -1,0 +1,138 @@
+---
+title: "atac_rna"
+author: "Erica Ryu"
+date: "4/26/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/Users/ericaryu/Documents/school_stuff/grad_school/PSU/classes/STAT555/project/RNA-ATAC-Seq")
+```
+
+## Integrating the ATAC-seq and RNA-seq data
+
+The purpose of this script is to integrate ATAC-seq and RNA-seq data.
+
+# load data
+```{r}
+cmp_ery_rna <- read.csv("rna_seq/CMPvERY.csv")
+hsc_cmp_rna <- read.csv("rna_seq/HSC_CMP_compare.csv")
+cmp_cfue_rna <- read.csv("rna_seq/CMP_CFUE_compare.csv")
+
+cmp_ery_atac <- read.csv("atac_seq/ErythrovsCMP_atacseq_sigpval_5kb_logFC.tab.csv")
+hsc_cmp_atac <- read.csv("atac_seq/CMPvsHSC_atacseq_sigpval_5kb_logFC.tab.csv")
+cmp_cfue_atac <- read.csv("atac_seq/CFUEvsCMP_atacseq_sigpval_5kb_logFC.tab.csv")
+
+```
+
+
+# identify overlaps between the significant DE genes and peaks
+```{r}
+# filter for genes that are significant
+cmp_ery_rna_sig <- cmp_ery_rna[(cmp_ery_rna[,c("padj")]<0.05),]
+cmp_ery_rna_sig <- na.omit(cmp_ery_rna_sig)
+hsc_cmp_rna_sig <- hsc_cmp_rna[(hsc_cmp_rna[,c("padj")]<0.05),]
+hsc_cmp_rna_sig <- na.omit(hsc_cmp_rna_sig)
+cmp_cfue_rna_sig <- cmp_cfue_rna[(cmp_cfue_rna[,c("padj")]<0.05),]
+cmp_cfue_rna_sig <- na.omit(cmp_cfue_rna_sig)
+
+# extract genes and fold change
+cmp_ery_rna_gene <- cmp_ery_rna_sig[c("log2FoldChange", "gene_symbol")]
+hsc_cmp_rna_gene <- hsc_cmp_rna_sig[c("log2FoldChange", "gene_symbol")]
+cmp_cfue_rna_gene <- cmp_cfue_rna_sig[c("log2FoldChange", "gene_symbol")]
+
+cmp_ery_atac_gene <- cmp_ery_atac[c("log2FoldChange", "gene_symbol")]
+hsc_cmp_atac_gene <- hsc_cmp_atac[c("log2FoldChange", "gene_symbol")]
+cmp_cfue_atac_gene <- cmp_cfue_atac[c("log2FoldChange", "gene_symbol")]
+
+# find number of unique genes
+cmp_ery_rna_uniq <- cmp_ery_rna_gene[!duplicated(cmp_ery_rna_gene$gene_symbol),]
+hsc_cmp_rna_uniq <- hsc_cmp_rna_gene[!duplicated(hsc_cmp_rna_gene$gene_symbol),]
+cmp_cfue_rna_uniq <- cmp_cfue_rna_gene[!duplicated(cmp_cfue_rna_gene$gene_symbol),]
+
+cmp_ery_atac_uniq <- cmp_ery_atac_gene[!duplicated(cmp_ery_atac_gene$gene_symbol),]
+hsc_cmp_atac_uniq <- hsc_cmp_atac_gene[!duplicated(hsc_cmp_atac_gene$gene_symbol),]
+cmp_cfue_atac_uniq <- cmp_cfue_atac_gene[!duplicated(cmp_cfue_atac_gene$gene_symbol),]
+
+# find what's overlapping between data types
+max_length_cmp_ery <- max(c(length(cmp_ery_rna_uniq$gene_symbol), length(cmp_ery_atac_uniq$gene_symbol))) 
+cmp_ery <- data.frame(col1 = c(cmp_ery_rna_uniq$gene_symbol, rep(NA, max_length_cmp_ery - length(cmp_ery_rna_uniq$gene_symbol))), col2 = c(cmp_ery_atac_uniq$gene_symbol,rep(NA, max_length_cmp_ery - length(cmp_ery_atac_uniq$gene_symbol))))
+
+max_length_hsc_cmp <- max(c(length(hsc_cmp_rna_uniq$gene_symbol), length(hsc_cmp_atac_uniq$gene_symbol))) 
+hsc_cmp <- data.frame(col1 = c(hsc_cmp_rna_uniq$gene_symbol, rep(NA, max_length_hsc_cmp - length(hsc_cmp_rna_uniq$gene_symbol))), col2 = c(hsc_cmp_atac_uniq$gene_symbol,rep(NA, max_length_hsc_cmp - length(hsc_cmp_atac_uniq$gene_symbol))))
+
+max_length_cmp_cfue <- max(c(length(cmp_cfue_rna_uniq$gene_symbol), length(cmp_cfue_atac_uniq$gene_symbol))) 
+cmp_cfue <- data.frame(col1 = c(cmp_cfue_rna_uniq$gene_symbol, rep(NA, max_length_cmp_cfue - length(cmp_cfue_rna_uniq$gene_symbol))), col2 = c(cmp_cfue_atac_uniq$gene_symbol,rep(NA, max_length_cmp_cfue - length(cmp_cfue_atac_uniq$gene_symbol))))
+
+write.csv(cmp_ery, "cmp_ery.csv")
+write.csv(hsc_cmp, "hsc_cmp.csv")
+write.csv(cmp_cfue, "cmp_cfue.csv")
+
+## positive and negative fold change
+# filter for promoters because it is expected to be the greatest indicator of whether a gene is accessible for transcription
+# filtered for the closest promoter because it's most likely to be directly related to the gene
+cmp_ery_atac_prom <- subset(cmp_ery_atac, annotation == "Promoter (<=1kb)")
+hsc_cmp_atac_prom <- subset(hsc_cmp_atac, annotation == "Promoter (<=1kb)")
+cmp_cfue_atac_prom <- subset(cmp_cfue_atac, annotation == "Promoter (<=1kb)")
+
+# check for repeats - still present
+cmp_ery_atac_prom_uniq <- cmp_ery_atac_prom[!duplicated(cmp_ery_atac_prom$gene_symbol),]
+hsc_cmp_atac_prom_uniq <- hsc_cmp_atac_prom[!duplicated(hsc_cmp_atac_prom$gene_symbol),]
+cmp_cfue_atac_prom_uniq <- cmp_cfue_atac_prom[!duplicated(cmp_cfue_atac_prom$gene_symbol),]
+
+# order based on gene and distance to TSS
+cmp_ery_atac_prom <- cmp_ery_atac_prom[order(cmp_ery_atac_prom$gene_symbol, abs(cmp_ery_atac_prom$distanceToTSS)),]
+hsc_cmp_atac_prom <- hsc_cmp_atac_prom[order(hsc_cmp_atac_prom$gene_symbol, abs(hsc_cmp_atac_prom$distanceToTSS)),]
+cmp_cfue_atac_prom <- cmp_cfue_atac_prom[order(cmp_cfue_atac_prom$gene_symbol, abs(cmp_cfue_atac_prom$distanceToTSS)),]
+
+# remove the farther peaks
+cmp_ery_atac_prom_simp <- cmp_ery_atac_prom[!duplicated(cmp_ery_atac_prom$gene_symbol),]
+hsc_cmp_atac_prom_simp <- hsc_cmp_atac_prom[!duplicated(hsc_cmp_atac_prom$gene_symbol),]
+cmp_cfue_atac_prom_simp <- cmp_cfue_atac_prom[!duplicated(cmp_cfue_atac_prom$gene_symbol),]
+
+# filter based on positive fold change
+cmp_ery_rna_pos <- subset(cmp_ery_rna_uniq, log2FoldChange > 0)
+hsc_cmp_rna_pos <- subset(hsc_cmp_rna_uniq, log2FoldChange > 0)
+cmp_cfue_rna_pos <- subset(cmp_cfue_rna_uniq, log2FoldChange > 0)
+
+cmp_ery_atac_pos <- subset(cmp_ery_atac_prom_simp, log2FoldChange > 0)
+hsc_cmp_atac_pos <- subset(hsc_cmp_atac_prom_simp, log2FoldChange > 0)
+cmp_cfue_atac_pos <- subset(cmp_cfue_atac_prom_simp, log2FoldChange > 0)
+
+# filter based on negative fold change
+cmp_ery_rna_neg <- subset(cmp_ery_rna_uniq, log2FoldChange < 0)
+hsc_cmp_rna_neg <- subset(hsc_cmp_rna_uniq, log2FoldChange < 0)
+cmp_cfue_rna_neg <- subset(cmp_cfue_rna_uniq, log2FoldChange < 0)
+
+cmp_ery_atac_neg <- subset(cmp_ery_atac_prom_simp, log2FoldChange < 0)
+hsc_cmp_atac_neg <- subset(hsc_cmp_atac_prom_simp, log2FoldChange < 0)
+cmp_cfue_atac_neg <- subset(cmp_cfue_atac_prom_simp, log2FoldChange < 0)
+
+# combine the two datatypes into one dataframe
+max_length_cmp_ery_pos <- max(c(length(cmp_ery_rna_pos$gene_symbol), length(cmp_ery_atac_pos$gene_symbol))) 
+cmp_ery_pos <- data.frame(col1 = c(cmp_ery_rna_pos$gene_symbol, rep(NA, max_length_cmp_ery_pos - length(cmp_ery_rna_pos$gene_symbol))), col2 = c(cmp_ery_atac_pos$gene_symbol,rep(NA, max_length_cmp_ery_pos - length(cmp_ery_atac_pos$gene_symbol))))
+
+max_length_hsc_cmp_pos <- max(c(length(hsc_cmp_rna_pos$gene_symbol), length(hsc_cmp_atac_pos$gene_symbol))) 
+hsc_cmp_pos <- data.frame(col1 = c(hsc_cmp_rna_pos$gene_symbol, rep(NA, max_length_hsc_cmp_pos - length(hsc_cmp_rna_pos$gene_symbol))), col2 = c(hsc_cmp_atac_pos$gene_symbol,rep(NA, max_length_hsc_cmp_pos - length(hsc_cmp_atac_pos$gene_symbol))))
+
+max_length_cmp_cfue_pos <- max(c(length(cmp_cfue_rna_pos$gene_symbol), length(cmp_cfue_atac_pos$gene_symbol)))
+cmp_cfue_pos <- data.frame(col1 = c(cmp_cfue_rna_pos$gene_symbol, rep(NA, max_length_cmp_cfue_pos - length(cmp_cfue_rna_pos$gene_symbol))), col2 = c(cmp_cfue_atac_pos$gene_symbol,rep(NA, max_length_cmp_cfue_pos - length(cmp_cfue_atac_pos$gene_symbol))))
+
+max_length_cmp_ery_neg <- max(c(length(cmp_ery_rna_neg$gene_symbol), length(cmp_ery_atac_neg$gene_symbol))) 
+cmp_ery_neg <- data.frame(col1 = c(cmp_ery_rna_neg$gene_symbol, rep(NA, max_length_cmp_ery_neg - length(cmp_ery_rna_neg$gene_symbol))), col2 = c(cmp_ery_atac_neg$gene_symbol,rep(NA, max_length_cmp_ery_neg - length(cmp_ery_atac_neg$gene_symbol))))
+
+max_length_hsc_cmp_neg <- max(c(length(hsc_cmp_rna_neg$gene_symbol), length(hsc_cmp_atac_neg$gene_symbol))) 
+hsc_cmp_neg <- data.frame(col1 = c(hsc_cmp_rna_neg$gene_symbol, rep(NA, max_length_hsc_cmp_neg - length(hsc_cmp_rna_neg$gene_symbol))), col2 = c(hsc_cmp_atac_neg$gene_symbol,rep(NA, max_length_hsc_cmp_neg - length(hsc_cmp_atac_neg$gene_symbol))))
+
+max_length_cmp_cfue_neg <- max(c(length(cmp_cfue_rna_neg$gene_symbol), length(cmp_cfue_atac_neg$gene_symbol)))
+cmp_cfue_neg <- data.frame(col1 = c(cmp_cfue_rna_neg$gene_symbol, rep(NA, max_length_cmp_cfue_neg - length(cmp_cfue_rna_neg$gene_symbol))), col2 = c(cmp_cfue_atac_neg$gene_symbol,rep(NA, max_length_cmp_cfue_neg - length(cmp_cfue_atac_neg$gene_symbol))))
+
+write.csv(cmp_ery_pos, "cmp_ery_pos.csv")
+write.csv(hsc_cmp_pos, "hsc_cmp_pos.csv")
+write.csv(cmp_cfue_pos, "cmp_cfue_pos.csv")
+write.csv(cmp_ery_neg, "cmp_ery_neg.csv")
+write.csv(hsc_cmp_neg, "hsc_cmp_neg.csv")
+write.csv(cmp_cfue_neg, "cmp_cfue_neg.csv")
+```
+
