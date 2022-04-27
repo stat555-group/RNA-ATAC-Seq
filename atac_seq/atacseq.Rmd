@@ -1,6 +1,6 @@
 ---
 title: 'STAT555 Project : ATAC-Seq Analysis'
-author: "Avantika Diwadkar"
+author: "Avantika Diwadkar and Kobie Kirven"
 date: "4/20/2022"
 output: html_document
 always_allow_html: true
