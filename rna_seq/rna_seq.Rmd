@@ -411,6 +411,8 @@ volcanoplot <- ggplot(res_df, aes(x=log2FoldChange, y=-log10(pvalue), col = Expr
   labs(x=expression(log[2](Fold~change)), y=expression(-log[10](p-value)))
 volcanoplot
 ```
+
+```{r}
 ### All gene heatmap for comparison 2
 make_heatmap <- function(df){
 #Log2 of counts
@@ -433,6 +435,20 @@ heatmap.2(na.omit(top.mat), col=viridis(256, option="B"),
 legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.8) #use list of assigned colors
 }
 make_heatmap(res_df)
+```
+
+# Go term analysis for comparision 2
+```{r}
+HSC_vs_CMP <- go_enrichment(res_df)
+
+png(file="HSC_vs_CMP_go_rna_seq.png",
+width=5000, height=3500, res=400)
+dotplot(HSC_vs_CMP, showCategory=10, split=".sign",
+        title="HSC vs CMP") + facet_grid(.~.sign)
+dev.off()
+
+```
+
 
 ### RNA-seq comparison 3: CMP vs CFU-E cells
 
