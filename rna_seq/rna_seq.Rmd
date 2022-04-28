@@ -178,7 +178,7 @@ legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.8) #use
 make_heatmap(res_df)
 ```
 
-### Volcano Plot FOR DESEQ2
+# Volcano Plot FOR DESEQ2
 
 ```{r}
 library(ggplot2)
@@ -296,8 +296,27 @@ res_vdf$gene_symbol[which(res_vdf$gene_symbol=='')] <- NA
 res_vdf
 ```
 ### Heatmap for limma voom
-
-```{r fig.height=10, fig.width=12}
+```{r} 
+make_heatmap <- function(df){
+  #Log2 of counts
+  mat = log2(td$counts+1)
+  
+  #Top 20 genes
+  top.mat <- mat[rownames(mat)%in%df[1:18348,"Gene"],] 
+  array_name <- colnames(mat)
+  gene_symbol=df[1:18348,"gene_symbol"]
+  
+  #Make heatmap
+  heatmap.2(na.omit(top.mat), col=viridis(256, option="B"),
+            ColSideColors=colour_status_list, #use list of assigned colors
+            labCol=array_name, labRow=FALSE, 
+            trace="none",
+            margins=c(12,20), 
+            cexRow=1,cexCol=1,
+            keysize=1.5,key.title=NA,key.xlab="Log2-normalized counts",key.ylab="Counts",
+            main="")
+  legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.8) #use list of assigned colors
+}
 make_heatmap(res_vdf)
 ```
 
