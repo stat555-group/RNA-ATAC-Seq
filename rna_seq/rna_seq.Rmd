@@ -154,6 +154,8 @@ make_heatmap <- function(df){
 
 make_heatmap(res_df)
 ```
+
+```{r}
 ### All gene heatmap
 make_heatmap <- function(df){
   #Log2 of counts
@@ -208,6 +210,7 @@ volcanoplot
 ```
 
 ```{r}
+library(org.Mm.eg.db)
 go_enrichment <- function(df) {
 
   # we want the log2 fold change 
@@ -438,6 +441,35 @@ make_heatmap(res_df)
 ```
 
 # Go term analysis for comparision 2
+
+```{r}
+library(org.Mm.eg.db)
+go_enrichment <- function(df) {
+
+  # we want the log2 fold change 
+  original_gene_list <- df$log2FoldChange
+  
+  # name the vector
+  names(original_gene_list) <- df$Gene
+  
+  # omit any NA values 
+  gene_list<-na.omit(original_gene_list)
+  
+  # sort the list in decreasing order (required for clusterProfiler)
+  gene_list = sort(gene_list, decreasing = TRUE)
+  
+  gse <- gseGO(geneList=gene_list, 
+               keyType = "ENSEMBL", 
+               nPerm = 10000, 
+               minGSSize = 3, 
+               maxGSSize = 800, 
+               pvalueCutoff = 0.05, 
+               verbose = TRUE, 
+               OrgDb = org.Mm.eg.db, 
+               pAdjustMethod = "none")
+  return(gse)
+}
+```
 ```{r}
 HSC_vs_CMP <- go_enrichment(res_df)
 
@@ -514,6 +546,8 @@ volcanoplot <- ggplot(res_df, aes(x=log2FoldChange, y=-log10(pvalue), col = Expr
   labs(x=expression(log[2](Fold~change)), y=expression(-log[10](p-value)))
 volcanoplot
 ```
+
+```{r}
 ### All gene heatmap for comparison 3
 make_heatmap <- function(df){
 #Log2 of counts
@@ -536,4 +570,14 @@ heatmap.2(na.omit(top.mat), col=viridis(256, option="B"),
 legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.8) #use list of assigned colors
 }
 make_heatmap(res_df)
+```
 
+```{r}
+CMP_vs_CFUE <- go_enrichment(res_df)
+
+png(file="CMP_vs_CFUE_go_rna_seq.png",
+width=5000, height=3500, res=400)
+dotplot(CMP_vs_CFUE, showCategory=10, split=".sign",
+        title="CMP vs CFUE") + facet_grid(.~.sign)
+dev.off()
+```
