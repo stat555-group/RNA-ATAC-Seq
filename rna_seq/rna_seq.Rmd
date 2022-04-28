@@ -120,7 +120,7 @@ plotMA(dds,ylim=c(-2,2))
 hist(res$padj, main=" ", xlab="adjusted p-value", breaks=50, col="deepskyblue4", xaxp  = c(0, 1, 20))
 ```
 
-### Heatmap
+### TOP20 genes Heatmap
 
 ```{r fig.height=10, fig.width=12}
 library(gplots)
@@ -154,23 +154,59 @@ make_heatmap <- function(df){
 
 make_heatmap(res_df)
 ```
+### All gene heatmap
+make_heatmap <- function(df){
+  #Log2 of counts
+  mat = log2(dds_count+1)
 
-### Volcano Plot
+#Include all genes
+top.mat <- mat[rownames(mat)%in%df[1:18348,"Gene"],] 
+array_name <- colnames(mat)
+gene_symbol=df[1:18348,"gene_symbol"]
+
+#Make heatmap
+heatmap.2(na.omit(top.mat), col=viridis(256, option="B"),
+          ColSideColors=colour_status_list, #use list of assigned colors
+          labCol=array_name, labRow=FALSE, 
+          trace="none",
+          margins=c(12,20), 
+          cexRow=1,cexCol=1,
+          keysize=1.5,key.title=NA,key.xlab="Log2-normalized counts",key.ylab="Counts",
+          main="")
+legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.8) #use list of assigned colors
+}
+make_heatmap(res_df)
+```
+
+### Volcano Plot FOR DESEQ2
 
 ```{r}
 library(ggplot2)
+library(readr)
+library(ggrepel)
+library(extrafont)
 
-ggplot(res_df, aes(x=log2FoldChange, y=-log10(padj))) + geom_point(size=0.5) +
+#Adding additional columns to res_df test for significance and log2FC threshold
+res_df$Expression <- "NO"
+res_df$Expression[res_df$log2FoldChange > 1 & res_df$pvalue < 0.05] <- "UP"
+res_df$Expression[res_df$log2FoldChange < -1 & res_df$pvalue < 0.05] <- "DOWN"
+res_df$label <- NA
+res_df$label[res_df$Expression != "NO"] <- res_df$gene_symbol[res_df$Expression != "NO"]
+
+volcanoplot <- ggplot(res_df, aes(x=log2FoldChange, y=-log10(pvalue), col = Expression, label = label))+
+  geom_point()+
+  theme_classic()+
+  theme(text = element_text(size = 20, family = "Arial", color = "black"))+
   geom_vline(xintercept=c(-1, 1), col="grey", linetype = "dashed") +
   geom_hline(yintercept=-log10(0.05), col="grey", linetype = "dashed")+
   scale_color_manual(values = c("blue", "grey", "red"))+
   xlim(-4, 4)+
-  geom_text(aes(fontface = "bold"))+
-  theme_classic()+
-  theme(legend.position = "top", axis.title = element_text(size = 20, family = "Arial", color = "black"))
-  #labs(x=expression(log[2](Fold~change)), y=expression(-log[10](p-value)))
-
+  geom_text_repel(aes(fontface = "bold"))+
+  theme(legend.position = "top")+
+  labs(x=expression(log[2](Fold~change)), y=expression(-log[10](p-value)))
+volcanoplot
 ```
+
 ```{r}
 go_enrichment <- function(df) {
 
@@ -264,4 +300,205 @@ res_vdf
 ```{r fig.height=10, fig.width=12}
 make_heatmap(res_vdf)
 ```
+
+### Volcano Plot FOR limma voom
+
+```{r}
+#Make sure to load previous libraries in the DESEQ2 version
+
+#Adding additional columns to res_df test for significance and log2FC threshold
+#The first command is because limma voom only gives logFC of 10 --> made a column for log2FC
+res_vdf$log2foldchange <- log2(10^(res_vdf$logFC))
+res_df$Expression <- "NO"
+res_df$Expression[res_df$log2foldchange > 1 & res_df$P.Value < 0.05] <- "UP"
+res_df$Expression[res_df$log2foldchange < -1 & res_df$P.Value < 0.05] <- "DOWN"
+res_df$label <- NA
+res_df$label[res_df$Expression != "NO"] <- res_df$gene_symbol[res_df$Expression != "NO"]
+
+volcanoplot <- ggplot(res_df, aes(x=log2FoldChange, y=-log10(pvalue), col = Expression, label = label))+
+  geom_point()+
+  theme_classic()+
+  theme(text = element_text(size = 20, family = "Arial", color = "black"))+
+  geom_vline(xintercept=c(-1, 1), col="grey", linetype = "dashed") +
+  geom_hline(yintercept=-log10(0.05), col="grey", linetype = "dashed")+
+  scale_color_manual(values = c("blue", "grey", "red"))+
+  xlim(-4, 4)+
+  geom_text_repel(aes(fontface = "bold"))+
+  theme(legend.position = "top")+
+  labs(x=expression(log[2](Fold~change)), y=expression(-log[10](p-value)))
+volcanoplot
+```
+### RNA-seq comparison 2: HSC vs CMP cells
+
+```{r}
+#Assign variables
+cell1 <- "HSC"
+cell2 <- "CMP"
+#Filter coldata by conditions
+coldata_curr <- coldata[which(coldata$Status==cell1 | coldata$Status==cell2),]
+coldata_curr <- coldata_curr[order(as.character(coldata_curr$Sample)), ]
+coldata_curr$Status <- factor(coldata_curr$Status, levels = c(cell1,cell2)) 
+rownames(coldata_curr) <- coldata_curr$Sample
+coldata_curr$Sample <- NULL
+```
+
+### DE analysis using DESEQ2 for comparison 2
+
+```{r, eval=T, echo=F, message=F}
+#subset countdata and pdata to 
+countdata_curr <- count_data[,which(colnames(count_data) %in% rownames(coldata_curr))] 
+#columns must be ordered in the same way
+countdata_curr <- countdata_curr[ ,order(as.character(names(countdata_curr)))] 
+library(DESeq2)
+ddsFullCountTable <- DESeqDataSetFromMatrix(countData = countdata_curr, colData = coldata_curr, design = ~ Status)
+dds <- DESeq(ddsFullCountTable)
+#normalized counts
+dds_count <- counts(dds, normalize=T)
+```
+
+```{r}
+# output results
+res <- results(dds, cooksCutoff=FALSE, independentFiltering=FALSE)
+res$gene_id <- row.names(res) 
+# add gene symbols for DE results
+res_df <- as.data.frame(res)
+res_df <-  merge(count_data[which(count_data$Gene%in%res_df$gene_id),c("Gene","gene_symbol")],res_df,by.x="Gene",by.y="gene_id")
+res_df <- res_df[order(res_df$pvalue, decreasing=FALSE),]
+# writing out a csv to look at genes in excel
+write.csv(res_df, "HSC_CMP_compare.csv")
+```
+### Volcano Plot FOR DESEQ2 comparison 2
+
+```{r}
+#Remember to load libraries from comparison 1
+
+#Adding additional columns to res_df test for significance and log2FC threshold
+res_df$Expression <- "NO"
+res_df$Expression[res_df$log2FoldChange > 1 & res_df$pvalue < 0.05] <- "UP"
+res_df$Expression[res_df$log2FoldChange < -1 & res_df$pvalue < 0.05] <- "DOWN"
+res_df$label <- NA
+res_df$label[res_df$Expression != "NO"] <- res_df$gene_symbol[res_df$Expression != "NO"]
+
+volcanoplot <- ggplot(res_df, aes(x=log2FoldChange, y=-log10(pvalue), col = Expression, label = label))+
+  geom_point()+
+  theme_classic()+
+  theme(text = element_text(size = 20, family = "Arial", color = "black"))+
+  geom_vline(xintercept=c(-1, 1), col="grey", linetype = "dashed") +
+  geom_hline(yintercept=-log10(0.05), col="grey", linetype = "dashed")+
+  scale_color_manual(values = c("blue", "grey", "red"))+
+  xlim(-4, 4)+
+  geom_text_repel(aes(fontface = "bold"))+
+  theme(legend.position = "top")+
+  labs(x=expression(log[2](Fold~change)), y=expression(-log[10](p-value)))
+volcanoplot
+```
+### All gene heatmap for comparison 2
+make_heatmap <- function(df){
+#Log2 of counts
+mat = log2(dds_count+1)
+
+#All genes
+top.mat <- mat[rownames(mat)%in%df[1:18348,"Gene"],] 
+array_name <- colnames(mat)
+gene_symbol=df[1:18348,"gene_symbol"]
+
+#Make heatmap
+heatmap.2(na.omit(top.mat), col=viridis(256, option="B"),
+          ColSideColors=colour_status_list, #use list of assigned colors
+          labCol=array_name, labRow=FALSE, 
+          trace="none",
+          margins=c(12,20), 
+          cexRow=1,cexCol=1,
+          keysize=1.5,key.title=NA,key.xlab="Log2-normalized counts",key.ylab="Counts",
+          main="")
+legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.8) #use list of assigned colors
+}
+make_heatmap(res_df)
+
+### RNA-seq comparison 3: CMP vs CFU-E cells
+
+```{r}
+#Assign variables
+cell1 <- "CMP"
+cell2 <- "CFU-E"
+#Filter coldata by conditions
+coldata_curr <- coldata[which(coldata$Status==cell1 | coldata$Status==cell2),]
+coldata_curr <- coldata_curr[order(as.character(coldata_curr$Sample)), ]
+coldata_curr$Status <- factor(coldata_curr$Status, levels = c(cell1,cell2)) 
+rownames(coldata_curr) <- coldata_curr$Sample
+coldata_curr$Sample <- NULL
+```
+
+### DE analysis using DESEQ2 for comparison 3
+
+```{r, eval=T, echo=F, message=F}
+#subset countdata and pdata to 
+countdata_curr <- count_data[,which(colnames(count_data) %in% rownames(coldata_curr))] 
+#columns must be ordered in the same way
+countdata_curr <- countdata_curr[ ,order(as.character(names(countdata_curr)))] 
+library(DESeq2)
+ddsFullCountTable <- DESeqDataSetFromMatrix(countData = countdata_curr, colData = coldata_curr, design = ~ Status)
+dds <- DESeq(ddsFullCountTable)
+#normalized counts
+dds_count <- counts(dds, normalize=T)
+```
+
+```{r}
+# output results
+res <- results(dds, cooksCutoff=FALSE, independentFiltering=FALSE)
+res$gene_id <- row.names(res) 
+# add gene symbols for DE results
+res_df <- as.data.frame(res)
+res_df <-  merge(count_data[which(count_data$Gene%in%res_df$gene_id),c("Gene","gene_symbol")],res_df,by.x="Gene",by.y="gene_id")
+res_df <- res_df[order(res_df$pvalue, decreasing=FALSE),]
+# writing out a csv to look at genes in excel
+write.csv(res_df, "CMP_CFUE_compare.csv")
+```
+### Volcano Plot FOR DESEQ2 comparison 3
+
+```{r}
+#Remember to load libraries from comparison 1
+
+#Adding additional columns to res_df test for significance and log2FC threshold
+res_df$Expression <- "NO"
+res_df$Expression[res_df$log2FoldChange > 1 & res_df$pvalue < 0.05] <- "UP"
+res_df$Expression[res_df$log2FoldChange < -1 & res_df$pvalue < 0.05] <- "DOWN"
+res_df$label <- NA
+res_df$label[res_df$Expression != "NO"] <- res_df$gene_symbol[res_df$Expression != "NO"]
+
+volcanoplot <- ggplot(res_df, aes(x=log2FoldChange, y=-log10(pvalue), col = Expression, label = label))+
+  geom_point()+
+  theme_classic()+
+  theme(text = element_text(size = 20, family = "Arial", color = "black"))+
+  geom_vline(xintercept=c(-1, 1), col="grey", linetype = "dashed") +
+  geom_hline(yintercept=-log10(0.05), col="grey", linetype = "dashed")+
+  scale_color_manual(values = c("blue", "grey", "red"))+
+  xlim(-4, 4)+
+  geom_text_repel(aes(fontface = "bold"))+
+  theme(legend.position = "top")+
+  labs(x=expression(log[2](Fold~change)), y=expression(-log[10](p-value)))
+volcanoplot
+```
+### All gene heatmap for comparison 3
+make_heatmap <- function(df){
+#Log2 of counts
+mat = log2(dds_count+1)
+
+#All genes
+top.mat <- mat[rownames(mat)%in%df[1:18348,"Gene"],] 
+array_name <- colnames(mat)
+gene_symbol=df[1:18348,"gene_symbol"]
+
+#Make heatmap
+heatmap.2(na.omit(top.mat), col=viridis(256, option="B"),
+          ColSideColors=colour_status_list, #use list of assigned colors
+          labCol=array_name, labRow=FALSE, 
+          trace="none",
+          margins=c(12,20), 
+          cexRow=1,cexCol=1,
+          keysize=1.5,key.title=NA,key.xlab="Log2-normalized counts",key.ylab="Counts",
+          main="")
+legend("bottomleft",legend=names(colour_status),fill=colour_status,cex=0.8) #use list of assigned colors
+}
+make_heatmap(res_df)
 
