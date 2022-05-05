@@ -65,9 +65,9 @@ hsc_cmp <- data.frame(col1 = c(hsc_cmp_rna_uniq$gene_symbol, rep(NA, max_length_
 max_length_cmp_cfue <- max(c(length(cmp_cfue_rna_uniq$gene_symbol), length(cmp_cfue_atac_uniq$gene_symbol))) 
 cmp_cfue <- data.frame(col1 = c(cmp_cfue_rna_uniq$gene_symbol, rep(NA, max_length_cmp_cfue - length(cmp_cfue_rna_uniq$gene_symbol))), col2 = c(cmp_cfue_atac_uniq$gene_symbol,rep(NA, max_length_cmp_cfue - length(cmp_cfue_atac_uniq$gene_symbol))))
 
-write.csv(cmp_ery, "cmp_ery.csv")
-write.csv(hsc_cmp, "hsc_cmp.csv")
-write.csv(cmp_cfue, "cmp_cfue.csv")
+# write.csv(cmp_ery, "cmp_ery.csv")
+# write.csv(hsc_cmp, "hsc_cmp.csv")
+# write.csv(cmp_cfue, "cmp_cfue.csv")
 
 ## positive and negative fold change
 # filter for promoters because it is expected to be the greatest indicator of whether a gene is accessible for transcription
@@ -111,22 +111,22 @@ cmp_cfue_atac_neg <- subset(cmp_cfue_atac_prom_simp, log2FoldChange < 0)
 
 # combine the two datatypes into one dataframe
 max_length_cmp_ery_pos <- max(c(length(cmp_ery_rna_pos$gene_symbol), length(cmp_ery_atac_pos$gene_symbol))) 
-cmp_ery_pos <- data.frame(col1 = c(cmp_ery_rna_pos$gene_symbol, rep(NA, max_length_cmp_ery_pos - length(cmp_ery_rna_pos$gene_symbol))), col2 = c(cmp_ery_atac_pos$gene_symbol,rep(NA, max_length_cmp_ery_pos - length(cmp_ery_atac_pos$gene_symbol))))
+cmp_ery_pos <- data.frame(RNA = c(cmp_ery_rna_pos$gene_symbol, rep(NA, max_length_cmp_ery_pos - length(cmp_ery_rna_pos$gene_symbol))), ATAC = c(cmp_ery_atac_pos$gene_symbol,rep(NA, max_length_cmp_ery_pos - length(cmp_ery_atac_pos$gene_symbol))))
 
 max_length_hsc_cmp_pos <- max(c(length(hsc_cmp_rna_pos$gene_symbol), length(hsc_cmp_atac_pos$gene_symbol))) 
-hsc_cmp_pos <- data.frame(col1 = c(hsc_cmp_rna_pos$gene_symbol, rep(NA, max_length_hsc_cmp_pos - length(hsc_cmp_rna_pos$gene_symbol))), col2 = c(hsc_cmp_atac_pos$gene_symbol,rep(NA, max_length_hsc_cmp_pos - length(hsc_cmp_atac_pos$gene_symbol))))
+hsc_cmp_pos <- data.frame(RNA = c(hsc_cmp_rna_pos$gene_symbol, rep(NA, max_length_hsc_cmp_pos - length(hsc_cmp_rna_pos$gene_symbol))), ATAC = c(hsc_cmp_atac_pos$gene_symbol,rep(NA, max_length_hsc_cmp_pos - length(hsc_cmp_atac_pos$gene_symbol))))
 
 max_length_cmp_cfue_pos <- max(c(length(cmp_cfue_rna_pos$gene_symbol), length(cmp_cfue_atac_pos$gene_symbol)))
-cmp_cfue_pos <- data.frame(col1 = c(cmp_cfue_rna_pos$gene_symbol, rep(NA, max_length_cmp_cfue_pos - length(cmp_cfue_rna_pos$gene_symbol))), col2 = c(cmp_cfue_atac_pos$gene_symbol,rep(NA, max_length_cmp_cfue_pos - length(cmp_cfue_atac_pos$gene_symbol))))
+cmp_cfue_pos <- data.frame(RNA = c(cmp_cfue_rna_pos$gene_symbol, rep(NA, max_length_cmp_cfue_pos - length(cmp_cfue_rna_pos$gene_symbol))), ATAC = c(cmp_cfue_atac_pos$gene_symbol,rep(NA, max_length_cmp_cfue_pos - length(cmp_cfue_atac_pos$gene_symbol))))
 
 max_length_cmp_ery_neg <- max(c(length(cmp_ery_rna_neg$gene_symbol), length(cmp_ery_atac_neg$gene_symbol))) 
-cmp_ery_neg <- data.frame(col1 = c(cmp_ery_rna_neg$gene_symbol, rep(NA, max_length_cmp_ery_neg - length(cmp_ery_rna_neg$gene_symbol))), col2 = c(cmp_ery_atac_neg$gene_symbol,rep(NA, max_length_cmp_ery_neg - length(cmp_ery_atac_neg$gene_symbol))))
+cmp_ery_neg <- data.frame(RNA = c(cmp_ery_rna_neg$gene_symbol, rep(NA, max_length_cmp_ery_neg - length(cmp_ery_rna_neg$gene_symbol))), ATAC = c(cmp_ery_atac_neg$gene_symbol,rep(NA, max_length_cmp_ery_neg - length(cmp_ery_atac_neg$gene_symbol))))
 
 max_length_hsc_cmp_neg <- max(c(length(hsc_cmp_rna_neg$gene_symbol), length(hsc_cmp_atac_neg$gene_symbol))) 
-hsc_cmp_neg <- data.frame(col1 = c(hsc_cmp_rna_neg$gene_symbol, rep(NA, max_length_hsc_cmp_neg - length(hsc_cmp_rna_neg$gene_symbol))), col2 = c(hsc_cmp_atac_neg$gene_symbol,rep(NA, max_length_hsc_cmp_neg - length(hsc_cmp_atac_neg$gene_symbol))))
+hsc_cmp_neg <- data.frame(RNA = c(hsc_cmp_rna_neg$gene_symbol, rep(NA, max_length_hsc_cmp_neg - length(hsc_cmp_rna_neg$gene_symbol))), ATAC = c(hsc_cmp_atac_neg$gene_symbol,rep(NA, max_length_hsc_cmp_neg - length(hsc_cmp_atac_neg$gene_symbol))))
 
 max_length_cmp_cfue_neg <- max(c(length(cmp_cfue_rna_neg$gene_symbol), length(cmp_cfue_atac_neg$gene_symbol)))
-cmp_cfue_neg <- data.frame(col1 = c(cmp_cfue_rna_neg$gene_symbol, rep(NA, max_length_cmp_cfue_neg - length(cmp_cfue_rna_neg$gene_symbol))), col2 = c(cmp_cfue_atac_neg$gene_symbol,rep(NA, max_length_cmp_cfue_neg - length(cmp_cfue_atac_neg$gene_symbol))))
+cmp_cfue_neg <- data.frame(RNA = c(cmp_cfue_rna_neg$gene_symbol, rep(NA, max_length_cmp_cfue_neg - length(cmp_cfue_rna_neg$gene_symbol))), ATAC = c(cmp_cfue_atac_neg$gene_symbol,rep(NA, max_length_cmp_cfue_neg - length(cmp_cfue_atac_neg$gene_symbol))))
 
 write.csv(cmp_ery_pos, "cmp_ery_pos.csv")
 write.csv(hsc_cmp_pos, "hsc_cmp_pos.csv")
