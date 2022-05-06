@@ -581,3 +581,71 @@ dotplot(CMP_vs_CFUE, showCategory=10, split=".sign",
         title="CMP vs CFUE") + facet_grid(.~.sign)
 dev.off()
 ```
+
+### Clustering Analysis 
+
+# Read Data Files
+
+```{r}
+cmp1 <- read.csv("../integration/cmp_ery.csv")
+g1 <- intersect(cmp1$RNA, cmp1$ATAC)
+
+sg1 <- ErythroMinusCMP_results %>% dplyr::filter(gene_symbol %in% g1, pvalue < 0.01)
+
+cmp2 <- read.csv("../integration/hsc_cmp.csv")
+g2 <- intersect(cmp2$RNA, cmp2$ATAC)
+
+cmp3 <- read.csv("../integration/cmp_cfue.csv")
+g3 <- intersect(cmp3$RNA, cmp3$ATAC)
+
+overlap_genes <- unique(c(sg1$gene_symbol, g2, g3))
+
+#
+```
+
+# Make DESEQ2 normalized count matrix for all samples
+
+```{r}
+#Set Group
+Group <- factor(as.vector(coldata$Status))
+count_rdata <- count_data[,as.character(coldata$Sample)]
+metaDataR <- data.frame(Group, row.names = colnames(count_rdata))
+metaDataR$Group <- factor(metaDataR$Group, levels = c("HSC","CMP","CFUE","Erythroblast")) #set order 
+
+rnaDDS_table <- DESeqDataSetFromMatrix(count_rdata, metaDataR, ~Group) #rowRanges = consensusToCount
+rnaDDS <- DESeq(rnaDDS_table)
+
+#normalized counts
+rnaDDS_count <- counts(rnaDDS, normalize=T)
+```
+
+
+```{r fig.width=5, fig.height=5}
+make_heatmap_all_rnaseq <- function(df, metaData){
+    
+  #Log2 of counts
+  norm_counts = log2(rnaDDS_count+1)
+  mat <- norm_counts[, row.names(metaData)]
+  
+  #Top 50 genes
+  top.mat <- mat[rownames(mat)%in%df$Gene,] 
+  top.mat <- top.mat[order(match(rownames(top.mat),df$Gene)), , drop = FALSE]
+  rownames(top.mat) <- df$gene_symbol
+  
+  #assign colors
+  colour_status <- c("#1B9E77","#D95F02", "#7570B3", "#E7298A")
+  names(colour_status) <- as.vector(unique(metaData$Group))
+  colour_status_list <- unlist(lapply(as.vector(metaData$Group),function(x){colour_status[x]}))
+  
+  #Make heatmap
+  pheatmap(na.omit(top.mat), scale = "row", clustering_distance_rows = "euclidean", annotation_col = metaData)
+}
+
+#Get results dataframe
+res <- rbind(rbind(res_df1, res_df2),res_df3) %>% dplyr::filter(padj < 0.05, abs(log2FoldChange) > 0) %>% dplyr::filter(gene_symbol %in% overlap_genes) %>% dplyr::select(Gene, gene_symbol) %>% unique()
+      
+#View heatmap
+make_heatmap_all_rnaseq(res, metaDataR)
+
+```
+
